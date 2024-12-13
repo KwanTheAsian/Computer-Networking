@@ -85,7 +85,30 @@ class LoginWindow:
         else:
             # User not found
             self.status_label.configure(text="User not found!", text_color="#FF0000")
-            
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.connect((HOST, SERVER_PORT))
+                logging.info("Connected to server.")
+
+                # Gửi lệnh đến server
+                command = "login"  #đăng nhập
+                s.sendall(command.encode(FORMAT))
+
+                # Nhận phản hồi từ server
+                response = s.recv(1024).decode(FORMAT)
+                if response == "SERVER_FULL":
+                    self.status_label.configure(text="Server đã đầy. Hãy thử lại sau.", text_color="#FF0000")
+                    return  # Thoát nếu server đầy
+                elif response == "INVALID_COMMAND":
+                    self.status_label.configure(text="Lệnh không hợp lệ, hãy thử lại.", text_color="#FF0000")
+                else:
+                    # Xử lý các phản hồi khác từ server
+                    logging.info(f"Server response: {response}")   
+        except ConnectionRefusedError:
+            self.status_label.configure(text="Không thể kết nối đến server", text_color="#FF0000")
+        except Exception as e:
+            self.status_label.configure(text=f"Lỗi khi kết nối đến server: {e}", text_color="#FF0000")
+   
     def on_closing(self): 
         self.root.destroy()
         sys.exit()
