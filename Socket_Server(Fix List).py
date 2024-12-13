@@ -68,35 +68,39 @@ def handle_upload(conn, filename):
                 return
     logging.info(f"Tệp '{filename}' đã được lưu tại '{filepath}'.")
 
+
+client_semaphore = threading.Semaphore(4)
+
 def handle_client(conn: socket.socket, addr):
     logging.info(f"Connected to client: {addr}")
-    try:
-        while True:
-            msg = conn.recv(1024).decode(FORMAT)
-            if not msg:
-                break
-            logging.info(f"Client {addr}: {msg}")
+    with client_semaphore:
+        try:
+            while True:
+                msg = conn.recv(1024).decode(FORMAT)
+                if not msg:
+                    break
+                logging.info(f"Client {addr}: {msg}")
 
-            if msg.startswith ("upload"):
-                _, filename = msg.split(maxsplit=1)
-                handle_upload(conn, filename)
-            elif msg.startswith("download"):
-                _, filename = msg.split(maxsplit=1)
-                handle_download(conn, filename)
-            elif msg == "list":
-                handle_list_files(conn)
-            elif msg == "x":
-                logging.info(f"Client {addr} disconnected.")
-                break
-            else:
-                conn.sendall(b"INVALID_COMMAND")
-                logging.warning(f"Error command: {msg}")
+                if msg.startswith("upload"):
+                    _, filename = msg.split(maxsplit=1)
+                    handle_upload(conn, filename)
+                elif msg.startswith("download"):
+                    _, filename = msg.split(maxsplit=1)
+                    handle_download(conn, filename)
+                elif msg == "list":
+                    handle_list_files(conn)
+                elif msg == "x":
+                    logging.info(f"Client {addr} disconnected.")
+                    break
+                else:
+                    conn.sendall(b"INVALID_COMMAND")
+                    logging.warning(f"Error command: {msg}")
 
-    except Exception as e:
-        logging.error(f"Error while contacting with client {addr}: {e}")
-    finally:
-        conn.close()
-        logging.info(f"Client {addr} closed.")
+        except Exception as e:
+            logging.error(f"Error while contacting with client {addr}: {e}")
+        finally:
+            conn.close()
+            logging.info(f"Client {addr} closed.")
 
 
 # Xử lý lệnh liệt kê tệp
@@ -129,7 +133,15 @@ def main():
         while True:
             try:
                 conn, addr = s.accept()
-                threading.Thread(target=handle_client, args=(conn, addr), daemon=True).start()
+                # check #s client đang kết nối
+                if client_semaphore._value > 0:
+                    threading.Thread(target=handle_client, args=(conn, addr), daemon=True).start()
+                else:
+                    # Nếu đã hết slot kết nối, trả lại
+                    conn.send(b"SERVER_FULL")
+                    conn.close()
+                    logging.warning(f"Rejected connection from {addr}. Server is full.")
+
             except KeyboardInterrupt:
                 logging.info("Server is off.")
                 break
