@@ -104,7 +104,7 @@ def handle_list_files(conn):
     try:
         files = os.listdir(STORAGE_DIR)
         if not files:
-            conn.sendall(b"NO_FILES")
+            conn.sendall(b"NO_FILES---")
             logging.info(f"Không có tệp nào trong thư mục lưu trữ.")
             return
 

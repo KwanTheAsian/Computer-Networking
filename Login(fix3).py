@@ -287,7 +287,7 @@ class DownloadFileWindow:
         
         listfiles = list_files()  
         if isinstance(listfiles, list):  
-            listfiles = listfiles.split("\n")  
+            #listfiles = listfiles.split("\n")  
             data_list = [["Filename"]]  
             data_list.extend([[file] for file in listfiles if file.strip()])  # Tạo danh sách 2D
             table_frame = CTkScrollableFrame(master=self.frame, fg_color="transparent")
@@ -574,28 +574,35 @@ def upload_folder(folder_path, mode="sequential"):
 
 def list_files():
     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    client.settimeout(10)  # Timeout 10 giây
+    client.settimeout(1)  # Timeout 10 giây
     try:
         client.connect((HOST, SERVER_PORT))
         client.sendall(b"list")
 
-        response = client.recv(1024).decode(FORMAT)
-        if response == "NO_FILES":
+        response = client.recv(11).decode(FORMAT)
+        if response == "NO_FILES---":
             logging.info("Không có tệp nào trên server.")
             return []
         elif response == "FILES_START":
             logging.info("Danh sách các tệp trên server:")
+            file_list = []
             data = ""
             while True:
                 try:
                     chunk = client.recv(1024).decode(FORMAT)
-                    if chunk.strip() == "END":
+                    data = data + chunk
+                    data_temp = data.splitlines()
+                    end_str = data_temp[-1]
+                    if end_str == "END":
+                        for filename in data_temp:
+                            if filename == "END":
+                                break
+                            logging.info(filename)
+                            file_list.append(filename)
                         break
-                    data += chunk
                 except socket.timeout:
                     logging.error("Quá thời gian chờ khi nhận danh sách tệp từ server.")
                     break
-            file_list = data.strip().split("\n")  # Tách thành từng dòng
             return file_list
         else:
             logging.error("Lỗi không xác định từ server.")
